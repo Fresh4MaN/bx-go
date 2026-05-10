@@ -1,0 +1,49 @@
+# Бинарники
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Тестовый бинарник (`go test -c`)
+*.test
+
+# Результаты go coverage
+*.out
+coverage.*
+coverage/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Зависимости (раскомментируйте, если vendor не храните в репозитории)
+vendor/
+
+# Артефакты сборки и отладки
+debug
+__debug_bin
+
+# Секреты и локальное окружение
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Файлы ОС
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Логи
+*.log

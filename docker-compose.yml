@@ -1,0 +1,10 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bitrix
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./examples/custom_table/init.sql:/docker-entrypoint-initdb.d/init.sql
