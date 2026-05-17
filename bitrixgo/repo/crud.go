@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
@@ -12,14 +13,15 @@ import (
 	"bitrixgo/bitrixgo/query"
 )
 
-var ps = sq.StatementBuilder.PlaceholderFormat(sq.Question)
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
 
 // GetByID возвращает одну строку по первичному ключу.
-func (r *Repository[T]) GetByID(ctx context.Context, id any) (*T, error) {
-	opts := query.Options{
-		Filter: filter.Filter{"=" + r.meta.PrimaryKey: id},
-		Limit:  1,
-	}
+func (r *Repository[T]) GetByID(ctx context.Context, id any, opts query.Options) (*T, error) {
+	opts.Filter = filter.Filter{"=" + r.meta.PrimaryKey: id}
+	opts.Limit = 1
 	rows, err := r.GetList(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -60,7 +62,21 @@ func (r *Repository[T]) GetList(ctx context.Context, opts query.Options) ([]T, e
 		return nil, fmt.Errorf("repo: build select: %w", err)
 	}
 
-	dbRows, err := r.client.DB().QueryContext(ctx, sqlStr, args...)
+	result, err := r.queryRows(ctx, r.client.DB(), sqlStr, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(opts.With) > 0 {
+		if err := entity.Preload(ctx, tableClient{r.client}, r.meta, result, opts.With); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
+
+func (r *Repository[T]) queryRows(ctx context.Context, q querier, sqlStr string, args ...any) ([]T, error) {
+	dbRows, err := q.QueryContext(ctx, sqlStr, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repo: query: %w", err)
 	}
@@ -74,11 +90,18 @@ func (r *Repository[T]) GetList(ctx context.Context, opts query.Options) ([]T, e
 		}
 		result = append(result, item)
 	}
-	return result, dbRows.Err()
+	if err := dbRows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // Add вставляет новую строку и возвращает сгенерированный PK при auto-increment.
 func (r *Repository[T]) Add(ctx context.Context, item *T) (int64, error) {
+	return r.add(ctx, r.client.DB(), item)
+}
+
+func (r *Repository[T]) add(ctx context.Context, q querier, item *T) (int64, error) {
 	cols := r.meta.InsertColumns()
 	colNames := make([]string, len(cols))
 	for i, c := range cols {
@@ -95,7 +118,7 @@ func (r *Repository[T]) Add(ctx context.Context, item *T) (int64, error) {
 		return 0, fmt.Errorf("repo: build insert: %w", err)
 	}
 
-	res, err := r.client.DB().ExecContext(ctx, sqlStr, args...)
+	res, err := q.ExecContext(ctx, sqlStr, args...)
 	if err != nil {
 		return 0, fmt.Errorf("repo: insert: %w", err)
 	}
@@ -108,6 +131,10 @@ func (r *Repository[T]) Add(ctx context.Context, item *T) (int64, error) {
 
 // Update обновляет поля строки по первичному ключу.
 func (r *Repository[T]) Update(ctx context.Context, id any, fields map[string]any) error {
+	return r.update(ctx, r.client.DB(), id, fields)
+}
+
+func (r *Repository[T]) update(ctx context.Context, q querier, id any, fields map[string]any) error {
 	if len(fields) == 0 {
 		return nil
 	}
@@ -127,7 +154,7 @@ func (r *Repository[T]) Update(ctx context.Context, id any, fields map[string]an
 		return fmt.Errorf("repo: build update: %w", err)
 	}
 
-	res, err := r.client.DB().ExecContext(ctx, sqlStr, args...)
+	res, err := q.ExecContext(ctx, sqlStr, args...)
 	if err != nil {
 		return fmt.Errorf("repo: update: %w", err)
 	}
@@ -140,12 +167,16 @@ func (r *Repository[T]) Update(ctx context.Context, id any, fields map[string]an
 
 // Delete удаляет строку по первичному ключу.
 func (r *Repository[T]) Delete(ctx context.Context, id any) error {
+	return r.delete(ctx, r.client.DB(), id)
+}
+
+func (r *Repository[T]) delete(ctx context.Context, q querier, id any) error {
 	b := ps.Delete(r.table).Where(sq.Eq{r.meta.PrimaryKey: id})
 	sqlStr, args, err := b.ToSql()
 	if err != nil {
 		return fmt.Errorf("repo: build delete: %w", err)
 	}
-	res, err := r.client.DB().ExecContext(ctx, sqlStr, args...)
+	res, err := q.ExecContext(ctx, sqlStr, args...)
 	if err != nil {
 		return fmt.Errorf("repo: delete: %w", err)
 	}

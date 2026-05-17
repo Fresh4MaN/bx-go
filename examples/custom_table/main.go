@@ -28,7 +28,7 @@ type Consignee struct {
 	Guid    string `bx:"UF_GUID"`
 }
 
-func (Consignee) TableName() string { return "a_boostrade_lkk_consignee" }
+func (Consignee) TableName() string { return "consignee" }
 
 func main() {
 	ctx := context.Background()
@@ -54,7 +54,7 @@ func main() {
 	}
 	fmt.Println("added id:", id)
 
-	row, err := repository.GetByID(ctx, id)
+	row, err := repository.GetByID(ctx, id, query.Options{})
 	if err != nil {
 		log.Fatal("get:", err)
 	}

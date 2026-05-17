@@ -2,7 +2,6 @@ package entity_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,25 +10,26 @@ import (
 )
 
 type Consignee struct {
-	ID         int64     `bx:"ID;pk;auto"`
-	ProductURL string    `bx:"UF_PRODUCT_URL"`
-	Price      float64   `bx:"UF_PRICE"`
-	Active     bool      `bx:"UF_ACTIVE"`
-	CreatedAt  time.Time `bx:"UF_DATE_CREATE"`
+	ID      int64  `bx:"ID;pk;auto"`
+	Address string `bx:"UF_ADDRESS"`
+	Kpp     string `bx:"UF_KPP"`
+	Inn     string `bx:"UF_INN"`
+	Name    string `bx:"UF_NAME"`
+	Guid    string `bx:"UF_GUID"`
 }
 
-func (Consignee) TableName() string { return "my_price_watch" }
+func (Consignee) TableName() string { return "consignee" }
 
 func TestFor(t *testing.T) {
 	meta, err := entity.For[Consignee]()
 	require.NoError(t, err)
 
-	assert.Equal(t, "my_price_watch", meta.Table)
+	assert.Equal(t, "consignee", meta.Table)
 	assert.Equal(t, "ID", meta.PrimaryKey)
-	assert.Len(t, meta.Fields, 5)
+	assert.Len(t, meta.Fields, 6)
 
 	cols := meta.InsertColumns()
-	assert.Len(t, cols, 4)
+	assert.Len(t, cols, 5)
 	for _, c := range cols {
 		assert.NotEqual(t, "ID", c.Column)
 	}

@@ -9,4 +9,5 @@ type Options struct {
 	Order  map[string]string
 	Limit  uint64
 	Offset uint64
+	With   []string
 }
