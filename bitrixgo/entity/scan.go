@@ -84,6 +84,11 @@ func ValuesFromMap(meta *Meta, fields map[string]any) ([]string, []any, error) {
 	return cols, vals, nil
 }
 
+// FieldToDB преобразует значение поля struct в значение для SQL.
+func FieldToDB(fv reflect.Value, f Field) (any, error) {
+	return fieldToDB(fv, f)
+}
+
 func fieldToDB(fv reflect.Value, f Field) (any, error) {
 	if !fv.IsValid() {
 		return nil, nil

@@ -21,7 +21,7 @@ type TableClient interface {
 	FullTableName(logical string) string
 }
 
-// Preload подгружает many-to-one связи отдельными SELECT.
+// Preload подгружает many-to-one и one-to-many связи отдельными SELECT.
 func Preload(ctx context.Context, client TableClient, meta *Meta, rows any, with []string) error {
 	if len(with) == 0 {
 		return nil
@@ -40,11 +40,143 @@ func Preload(ctx context.Context, client TableClient, meta *Meta, rows any, with
 		if err != nil {
 			return err
 		}
+		if rel.Inverse {
+			if err := preloadInverse(ctx, client, meta, rv, rel); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := preloadRelation(ctx, client, meta, rv, rel); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func preloadInverse(ctx context.Context, client TableClient, parentMeta *Meta, rows reflect.Value, rel *Relation) error {
+	childMeta, err := ForType(rel.Target)
+	if err != nil {
+		return err
+	}
+
+	parentIDs := collectParentPKs(parentMeta, rows)
+	if len(parentIDs) == 0 {
+		return nil
+	}
+
+	children, err := loadByFK(ctx, client, childMeta, rel.FKColumn, parentIDs)
+	if err != nil {
+		return err
+	}
+
+	grouped, err := groupByFK(childMeta, rel.FKIndex, children)
+	if err != nil {
+		return err
+	}
+
+	sliceType := reflect.SliceOf(childMeta.Type)
+	for i := 0; i < rows.Len(); i++ {
+		row := rows.Index(i)
+		pk, err := PrimaryKeyValueOf(parentMeta, row)
+		if err != nil {
+			return err
+		}
+		key, err := normalizeKey(pk)
+		if err != nil {
+			return err
+		}
+		if items, ok := grouped[key]; ok {
+			row.Field(rel.FieldIndex).Set(items)
+		} else {
+			row.Field(rel.FieldIndex).Set(reflect.MakeSlice(sliceType, 0, 0))
+		}
+	}
+	return nil
+}
+
+func collectParentPKs(meta *Meta, rows reflect.Value) []any {
+	pkField, ok := meta.FieldByColumn(meta.PrimaryKey)
+	if !ok {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var ids []any
+	for i := 0; i < rows.Len(); i++ {
+		pk := rows.Index(i).Field(pkField.Index)
+		if pk.Kind() == reflect.Pointer {
+			if pk.IsNil() {
+				continue
+			}
+			pk = pk.Elem()
+		}
+		if pk.IsZero() {
+			continue
+		}
+		key, err := normalizeKey(pk.Interface())
+		if err != nil {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		ids = append(ids, pk.Interface())
+	}
+	return ids
+}
+
+func loadByFK(ctx context.Context, client TableClient, meta *Meta, fkColumn string, ids []any) (reflect.Value, error) {
+	table := client.FullTableName(meta.Table)
+	cols := meta.SelectColumns()
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(ids)), ",")
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (%s)",
+		strings.Join(cols, ", "),
+		table,
+		fkColumn,
+		placeholders,
+	)
+
+	rows, err := client.QueryContext(ctx, query, ids...)
+	if err != nil {
+		return reflect.Value{}, fmt.Errorf("entity: preload inverse query: %w", err)
+	}
+	defer rows.Close()
+
+	sliceType := reflect.SliceOf(meta.Type)
+	result := reflect.MakeSlice(sliceType, 0, len(ids))
+	for rows.Next() {
+		ptr := reflect.New(meta.Type)
+		if err := ScanRow(rows, meta, ptr.Interface()); err != nil {
+			return reflect.Value{}, err
+		}
+		result = reflect.Append(result, ptr.Elem())
+	}
+	return result, rows.Err()
+}
+
+func groupByFK(meta *Meta, fkIndex int, rows reflect.Value) (map[string]reflect.Value, error) {
+	sliceType := reflect.SliceOf(meta.Type)
+	out := make(map[string]reflect.Value)
+	for i := 0; i < rows.Len(); i++ {
+		row := rows.Index(i)
+		fk := row.Field(fkIndex)
+		if fk.Kind() == reflect.Pointer {
+			if fk.IsNil() {
+				continue
+			}
+			fk = fk.Elem()
+		}
+		key, err := normalizeKey(fk.Interface())
+		if err != nil {
+			return nil, err
+		}
+		group, ok := out[key]
+		if !ok {
+			group = reflect.MakeSlice(sliceType, 0, 1)
+		}
+		out[key] = reflect.Append(group, row)
+	}
+	return out, nil
 }
 
 func preloadRelation(ctx context.Context, client TableClient, childMeta *Meta, rows reflect.Value, rel *Relation) error {
@@ -179,6 +311,36 @@ func normalizeKey(v any) (string, error) {
 		return x, nil
 	default:
 		return fmt.Sprintf("%v", v), nil
+	}
+}
+
+// ExtValueOf возвращает значение ext-поля; bool — задан ли ext в meta.
+func ExtValueOf(meta *Meta, rv reflect.Value) (any, bool, error) {
+	if meta.ExtColumn == "" {
+		return nil, false, nil
+	}
+	fv := rv.Field(meta.ExtIndex)
+	v, err := fieldValueForRead(fv)
+	return v, true, err
+}
+
+// IsEmptyExt проверяет, что ext-значение считается пустым.
+func IsEmptyExt(v any) bool {
+	if v == nil {
+		return true
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.String:
+		return rv.Len() == 0
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return rv.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return rv.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return rv.Float() == 0
+	default:
+		return rv.IsZero()
 	}
 }
 

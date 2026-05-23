@@ -1,10 +1,5 @@
 // Пример использования bitrixgo с кастомной таблицей Bitrix.
 //
-// Скопируйте .env.example в .env и укажите креды MySQL вашего Bitrix.
-// Для локального docker MySQL: docker compose up -d
-//
-// Запуск:
-//
 //	go run ./examples/custom_table
 package main
 

@@ -7,13 +7,25 @@ import (
 	bxerrors "bitrixgo/bitrixgo/errors"
 )
 
-// Relation описывает many-to-one связь дочерней сущности с родительской.
+// Relation описывает связь: many-to-one (struct) или one-to-many (slice + inverse).
 type Relation struct {
 	Name       string
 	Target     reflect.Type
 	FKColumn   string
 	FieldIndex int
 	FKIndex    int
+	Inverse    bool
+}
+
+// InverseRelations возвращает one-to-many связи родителя.
+func (m *Meta) InverseRelations() []Relation {
+	var out []Relation
+	for _, rel := range m.Relations {
+		if rel.Inverse {
+			out = append(out, rel)
+		}
+	}
+	return out
 }
 
 // RelationByName возвращает связь по имени rel-поля.
@@ -41,15 +53,29 @@ func RelationTo[Parent any](child *Meta) (*Relation, error) {
 	return nil, fmt.Errorf("%w: %s", bxerrors.ErrRelationNotFound, target.Name())
 }
 
-// DefaultRelation возвращает единственную связь или ошибку, если их несколько.
+// ChildFKRelation возвращает pseudo-relation для установки FK на дочерней сущности.
+func ChildFKRelation(fkColumn string, fkIndex int) *Relation {
+	return &Relation{
+		FKColumn: fkColumn,
+		FKIndex:  fkIndex,
+	}
+}
+
+// DefaultRelation возвращает единственную many-to-one связь или ошибку, если их несколько.
 func (m *Meta) DefaultRelation() (*Relation, error) {
-	if len(m.Relations) == 0 {
+	var m2one []Relation
+	for _, rel := range m.Relations {
+		if !rel.Inverse {
+			m2one = append(m2one, rel)
+		}
+	}
+	if len(m2one) == 0 {
 		return nil, fmt.Errorf("%w: no relations defined", bxerrors.ErrRelationNotFound)
 	}
-	if len(m.Relations) > 1 {
+	if len(m2one) > 1 {
 		return nil, fmt.Errorf("%w: multiple relations, specify name", bxerrors.ErrInvalidRelation)
 	}
-	return &m.Relations[0], nil
+	return &m2one[0], nil
 }
 
 // ResolveRelation возвращает связь по имени или единственную по умолчанию, если имя пустое.

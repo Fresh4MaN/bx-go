@@ -53,6 +53,43 @@ func TestForMissingTable(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestExtTag(t *testing.T) {
+	type Item struct {
+		ID   int64  `bx:"ID;pk;auto;table=t"`
+		Guid string `bx:"UF_GUID;ext"`
+		Name string `bx:"UF_NAME"`
+	}
+	meta, err := entity.For[Item]()
+	require.NoError(t, err)
+	assert.Equal(t, "UF_GUID", meta.ExtColumn)
+	assert.Equal(t, 1, meta.ExtIndex)
+
+	f, ok := meta.FieldByColumn("UF_GUID")
+	require.True(t, ok)
+	assert.True(t, f.Ext)
+}
+
+func TestMultipleExtError(t *testing.T) {
+	type Bad struct {
+		ID    int64  `bx:"ID;pk;auto;table=t"`
+		Guid1 string `bx:"UF_GUID1;ext"`
+		Guid2 string `bx:"UF_GUID2;ext"`
+	}
+	_, err := entity.For[Bad]()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple ext")
+}
+
+func TestUpdateColumns(t *testing.T) {
+	meta, err := entity.For[Consignee]()
+	require.NoError(t, err)
+	cols := meta.UpdateColumns()
+	assert.Len(t, cols, 5)
+	for _, c := range cols {
+		assert.NotEqual(t, "ID", c.Column)
+	}
+}
+
 func TestBoolIntConversion(t *testing.T) {
 	type Item struct {
 		ID     int64 `bx:"ID;pk;auto;table=t"`

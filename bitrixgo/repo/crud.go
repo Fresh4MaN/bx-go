@@ -135,6 +135,14 @@ func (r *Repository[T]) Update(ctx context.Context, id any, fields map[string]an
 }
 
 func (r *Repository[T]) update(ctx context.Context, q querier, id any, fields map[string]any) error {
+	return r.execUpdate(ctx, q, id, fields, true)
+}
+
+func (r *Repository[T]) upsertUpdate(ctx context.Context, q querier, id any, fields map[string]any) error {
+	return r.execUpdate(ctx, q, id, fields, false)
+}
+
+func (r *Repository[T]) execUpdate(ctx context.Context, q querier, id any, fields map[string]any, requireAffected bool) error {
 	if len(fields) == 0 {
 		return nil
 	}
@@ -158,9 +166,11 @@ func (r *Repository[T]) update(ctx context.Context, q querier, id any, fields ma
 	if err != nil {
 		return fmt.Errorf("repo: update: %w", err)
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return bxerrors.ErrNotFound
+	if requireAffected {
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			return bxerrors.ErrNotFound
+		}
 	}
 	return nil
 }

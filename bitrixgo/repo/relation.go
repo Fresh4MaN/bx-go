@@ -36,6 +36,9 @@ func (r *Repository[T]) AddCascade(ctx context.Context, item *T) (int64, error) 
 	row := reflectValueOf(item)
 	for i := range r.meta.Relations {
 		rel := &r.meta.Relations[i]
+		if rel.Inverse {
+			continue
+		}
 		nested := entity.NestedValue(row, rel)
 		if nested.Kind() == reflect.Pointer {
 			if nested.IsNil() {
@@ -52,30 +55,16 @@ func (r *Repository[T]) AddCascade(ctx context.Context, item *T) (int64, error) 
 			return 0, err
 		}
 
-		isZero, err := entity.IsZeroPrimaryKey(parentMeta, nested)
+		parentID, err := upsertReflect(ctx, tx, r.client, parentMeta, nested)
 		if err != nil {
 			return 0, err
 		}
-		if isZero {
-			parentID, err := insertReflect(ctx, tx, r.client, parentMeta, nested)
-			if err != nil {
-				return 0, err
-			}
-			if err := entity.SetPrimaryKey(parentMeta, nested, parentID); err != nil {
-				return 0, err
-			}
-		}
-
-		pk, err := entity.PrimaryKeyValueOf(parentMeta, nested)
-		if err != nil {
-			return 0, err
-		}
-		if err := entity.SetFK(r.meta, rel, row, pk); err != nil {
+		if err := entity.SetFK(r.meta, rel, row, parentID); err != nil {
 			return 0, err
 		}
 	}
 
-	id, err := r.add(ctx, tx, item)
+	id, err := r.upsert(ctx, tx, item)
 	if err != nil {
 		return 0, err
 	}
@@ -83,6 +72,51 @@ func (r *Repository[T]) AddCascade(ctx context.Context, item *T) (int64, error) 
 		return 0, fmt.Errorf("repo: commit: %w", err)
 	}
 	return id, nil
+}
+
+// SaveCascade сохраняет родителя и дочерние one-to-many записи (upsert, без delete лишних).
+func (r *Repository[T]) SaveCascade(ctx context.Context, item *T) (int64, error) {
+	tx, err := r.client.DB().BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("repo: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	row := reflectValueOf(item)
+
+	parentID, err := r.upsert(ctx, tx, item)
+	if err != nil {
+		return 0, err
+	}
+
+	for i := range r.meta.Relations {
+		rel := &r.meta.Relations[i]
+		if !rel.Inverse {
+			continue
+		}
+
+		childMeta, err := entity.ForType(rel.Target)
+		if err != nil {
+			return 0, err
+		}
+		fkRel := entity.ChildFKRelation(rel.FKColumn, rel.FKIndex)
+
+		sliceVal := row.Field(rel.FieldIndex)
+		for j := 0; j < sliceVal.Len(); j++ {
+			child := sliceVal.Index(j)
+			if err := entity.SetFK(childMeta, fkRel, child, parentID); err != nil {
+				return 0, err
+			}
+			if _, err := upsertReflect(ctx, tx, r.client, childMeta, child); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("repo: commit: %w", err)
+	}
+	return parentID, nil
 }
 
 // DeleteCascade удаляет дочерние записи и родителя в одной транзакции.

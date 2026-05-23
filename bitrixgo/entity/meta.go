@@ -24,6 +24,7 @@ type Field struct {
 	Kind      reflect.Kind
 	Type      reflect.Type
 	BoolYN    bool
+	Ext       bool
 	Relation  bool
 	RefTarget string
 }
@@ -33,6 +34,8 @@ type Meta struct {
 	Type       reflect.Type
 	Table      string
 	PrimaryKey string
+	ExtColumn  string
+	ExtIndex   int
 	Fields     []Field
 	Relations  []Relation
 	byColumn   map[string]*Field
@@ -123,6 +126,13 @@ func parseMeta(t reflect.Type) (*Meta, error) {
 				f.Auto = true
 			case p == "boolyn":
 				f.BoolYN = true
+			case p == "ext":
+				if m.ExtColumn != "" {
+					return nil, fmt.Errorf("entity: %s: multiple ext fields", t.Name())
+				}
+				f.Ext = true
+				m.ExtColumn = column
+				m.ExtIndex = i
 			case strings.HasPrefix(p, "table="):
 				m.Table = strings.TrimPrefix(p, "table=")
 			case strings.HasPrefix(p, "ref="):
@@ -150,29 +160,61 @@ func parseMeta(t reflect.Type) (*Meta, error) {
 }
 
 func parseRelationField(tag string, sf reflect.StructField, index int) (Relation, error) {
-	target := sf.Type
+	parts := strings.Split(tag, ";")
+	targetName := strings.TrimPrefix(strings.TrimSpace(parts[0]), "rel=")
+
+	fkColumn := ""
+	inverse := false
+	for _, p := range parts[1:] {
+		p = strings.TrimSpace(p)
+		switch {
+		case strings.HasPrefix(p, "fk="):
+			fkColumn = strings.TrimPrefix(p, "fk=")
+		case p == "inverse":
+			inverse = true
+		}
+	}
+	if fkColumn == "" {
+		return Relation{}, fmt.Errorf("%w: rel tag requires fk=", bxerrors.ErrInvalidRelation)
+	}
+
+	fieldType := sf.Type
+	if fieldType.Kind() == reflect.Slice {
+		if !inverse {
+			return Relation{}, fmt.Errorf("%w: rel on slice requires inverse", bxerrors.ErrInvalidRelation)
+		}
+		elemType := fieldType.Elem()
+		if elemType.Kind() == reflect.Pointer {
+			elemType = elemType.Elem()
+		}
+		if elemType.Kind() != reflect.Struct {
+			return Relation{}, fmt.Errorf("%w: rel slice element must be struct", bxerrors.ErrInvalidRelation)
+		}
+		if targetName == "" {
+			targetName = elemType.Name()
+		}
+		return Relation{
+			Name:       sf.Name,
+			Target:     elemType,
+			FKColumn:   fkColumn,
+			FieldIndex: index,
+			Inverse:    true,
+		}, nil
+	}
+
+	if inverse {
+		return Relation{}, fmt.Errorf("%w: inverse requires slice field", bxerrors.ErrInvalidRelation)
+	}
+
+	target := fieldType
 	if target.Kind() == reflect.Pointer {
 		target = target.Elem()
 	}
 	if target.Kind() != reflect.Struct {
 		return Relation{}, fmt.Errorf("%w: rel field must be struct", bxerrors.ErrInvalidRelation)
 	}
-
-	parts := strings.Split(tag, ";")
-	targetName := strings.TrimPrefix(strings.TrimSpace(parts[0]), "rel=")
 	if targetName == "" {
 		targetName = target.Name()
-	}
-
-	fkColumn := ""
-	for _, p := range parts[1:] {
-		p = strings.TrimSpace(p)
-		if strings.HasPrefix(p, "fk=") {
-			fkColumn = strings.TrimPrefix(p, "fk=")
-		}
-	}
-	if fkColumn == "" {
-		return Relation{}, fmt.Errorf("%w: rel tag requires fk=", bxerrors.ErrInvalidRelation)
 	}
 
 	return Relation{
@@ -186,17 +228,45 @@ func parseRelationField(tag string, sf reflect.StructField, index int) (Relation
 func (m *Meta) validateRelations() error {
 	for i := range m.Relations {
 		rel := &m.Relations[i]
+		if rel.Inverse {
+			idx, ok := fieldIndexByColumn(rel.Target, rel.FKColumn)
+			if !ok {
+				return fmt.Errorf("entity: %s: %w: unknown fk column %s on %s", m.Type.Name(), bxerrors.ErrInvalidRelation, rel.FKColumn, rel.Target.Name())
+			}
+			rel.FKIndex = idx
+			continue
+		}
+
 		fk, ok := m.FieldByColumn(rel.FKColumn)
 		if !ok {
 			return fmt.Errorf("entity: %s: %w: unknown fk column %s", m.Type.Name(), bxerrors.ErrInvalidRelation, rel.FKColumn)
 		}
 		rel.FKIndex = fk.Index
-
-		if _, err := ForType(rel.Target); err != nil {
-			return fmt.Errorf("entity: %s: relation %s: %w", m.Type.Name(), rel.Name, err)
-		}
 	}
 	return nil
+}
+
+// fieldIndexByColumn ищет индекс поля по имени колонки без полного parseMeta (без рекурсии по rel).
+func fieldIndexByColumn(t reflect.Type, column string) (int, bool) {
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	for i := 0; i < t.NumField(); i++ {
+		sf := t.Field(i)
+		if !sf.IsExported() {
+			continue
+		}
+		tag := sf.Tag.Get("bx")
+		if tag == "" || tag == "-" || strings.HasPrefix(tag, "rel=") {
+			continue
+		}
+		parts := strings.Split(tag, ";")
+		col := strings.TrimSpace(parts[0])
+		if col == column {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // ForType возвращает метаданные для reflect.Type (должен быть struct).
@@ -254,6 +324,21 @@ func (m *Meta) FieldByName(name string) (*Field, bool) {
 		}
 	}
 	return nil, false
+}
+
+// UpdateColumns возвращает колонки для UPDATE (без pk, auto и rel-полей).
+func (m *Meta) UpdateColumns() []Field {
+	out := make([]Field, 0, len(m.Fields))
+	for _, f := range m.Fields {
+		if f.Relation {
+			continue
+		}
+		if f.Primary {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // InsertColumns возвращает колонки и поля для INSERT (без pk+auto и rel-полей).

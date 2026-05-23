@@ -72,3 +72,81 @@ func TestInvalidRelationFK(t *testing.T) {
 	_, err := entity.For[Bad]()
 	require.Error(t, err)
 }
+
+type ParentContractor struct {
+	ID        int64      `bx:"ID;pk;auto"`
+	Name      string     `bx:"UF_NAME"`
+	Contracts []Contract `bx:"rel=Contract;fk=UF_CONTRACTOR_ID;inverse"`
+}
+
+func (ParentContractor) TableName() string { return "contractor" }
+
+func TestInverseRelationMeta(t *testing.T) {
+	meta, err := entity.For[ParentContractor]()
+	require.NoError(t, err)
+
+	require.Len(t, meta.Relations, 1)
+	rel := meta.Relations[0]
+	assert.True(t, rel.Inverse)
+	assert.Equal(t, "Contracts", rel.Name)
+	assert.Equal(t, "UF_CONTRACTOR_ID", rel.FKColumn)
+
+	insertCols := meta.InsertColumns()
+	for _, c := range insertCols {
+		assert.NotEqual(t, "Contracts", c.Name)
+	}
+
+	inverse := meta.InverseRelations()
+	require.Len(t, inverse, 1)
+	assert.Equal(t, "Contracts", inverse[0].Name)
+}
+
+func TestInverseRequiresSlice(t *testing.T) {
+	type Bad struct {
+		ID        int64    `bx:"ID;pk;auto;table=t"`
+		Contracts Contract `bx:"rel=Contract;fk=UF_CONTRACTOR_ID;inverse"`
+	}
+	_, err := entity.For[Bad]()
+	require.Error(t, err)
+}
+
+func TestSliceRequiresInverse(t *testing.T) {
+	type Bad struct {
+		ID        int64      `bx:"ID;pk;auto;table=t"`
+		Contracts []Contract `bx:"rel=Contract;fk=UF_CONTRACTOR_ID"`
+	}
+	_, err := entity.For[Bad]()
+	require.Error(t, err)
+}
+
+func TestInvalidInverseFK(t *testing.T) {
+	type BadParent struct {
+		ID        int64      `bx:"ID;pk;auto;table=t"`
+		Contracts []Contract `bx:"rel=Contract;fk=UF_MISSING;inverse"`
+	}
+	_, err := entity.For[BadParent]()
+	require.Error(t, err)
+}
+
+func TestCircularRelationMeta(t *testing.T) {
+	parentMeta, err := entity.For[cycleContractor]()
+	require.NoError(t, err)
+	childMeta, err := entity.For[cycleContract]()
+	require.NoError(t, err)
+	require.Len(t, parentMeta.InverseRelations(), 1)
+	require.Len(t, childMeta.Relations, 1)
+	assert.False(t, childMeta.Relations[0].Inverse)
+}
+
+type cycleContractor struct {
+	ID        int64           `bx:"ID;pk;auto;table=contractor"`
+	Name      string          `bx:"UF_NAME"`
+	Contracts []cycleContract `bx:"rel=cycleContract;fk=UF_CONTRACTOR_ID;inverse"`
+}
+
+type cycleContract struct {
+	ID           int64           `bx:"ID;pk;auto;table=contract"`
+	ContractorID int64           `bx:"UF_CONTRACTOR_ID;ref=cycleContractor"`
+	Contractor   cycleContractor `bx:"rel=cycleContractor;fk=UF_CONTRACTOR_ID"`
+	Name         string          `bx:"UF_NAME"`
+}

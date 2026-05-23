@@ -1,9 +1,5 @@
 // Пример связанных таблиц Contract → Contractor (many-to-one, FK).
 //
-// Скопируйте .env.example в .env и укажите креды MySQL вашего Bitrix.
-//
-// Запуск:
-//
 //	go run ./examples/custom_related_tables
 package main
 
@@ -30,7 +26,7 @@ type Contract struct {
 	Name          string     `bx:"UF_NAME"`
 	DateFrom      time.Time  `bx:"UF_DATE_FROM"`
 	Number        string     `bx:"UF_NUMBER"`
-	Guid          string     `bx:"UF_GUID"`
+	Guid          string     `bx:"UF_GUID;ext"`
 }
 
 func (Contract) TableName() string { return "contract" }
@@ -57,7 +53,7 @@ type Contractor struct {
 	LegalAddress                string  `bx:"UF_LEGAL_ADDRESS"`
 	Name                        string  `bx:"UF_NAME"`
 	ShortName                   string  `bx:"UF_SHORT_NAME"`
-	Guid                        string  `bx:"UF_GUID"`
+	Guid                        string  `bx:"UF_GUID;ext"`
 }
 
 func (Contractor) TableName() string { return "contractor" }
