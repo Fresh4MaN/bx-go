@@ -169,10 +169,34 @@ func (r *Repository[T]) execUpdate(ctx context.Context, q querier, id any, field
 	if requireAffected {
 		n, _ := res.RowsAffected()
 		if n == 0 {
-			return bxerrors.ErrNotFound
+			// MySQL не считает строку изменённой, если значения совпали с текущими.
+			exists, err := r.existsByPK(ctx, q, id)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return bxerrors.ErrNotFound
+			}
 		}
 	}
 	return nil
+}
+
+func (r *Repository[T]) existsByPK(ctx context.Context, q querier, id any) (bool, error) {
+	b := ps.Select("1").From(r.table).Where(sq.Eq{r.meta.PrimaryKey: id}).Limit(1)
+	sqlStr, args, err := b.ToSql()
+	if err != nil {
+		return false, fmt.Errorf("repo: build exists: %w", err)
+	}
+	rows, err := q.QueryContext(ctx, sqlStr, args...)
+	if err != nil {
+		return false, fmt.Errorf("repo: exists: %w", err)
+	}
+	defer rows.Close()
+	if rows.Next() {
+		return true, rows.Err()
+	}
+	return false, rows.Err()
 }
 
 // Delete удаляет строку по первичному ключу.
