@@ -1,6 +1,6 @@
 package query
 
-import "bitrixgo/bitrixgo/filter"
+import "github.com/Fresh4MaN/bx-go/bitrixgo/filter"
 
 // Options управляет параметрами GetList (в стиле Bitrix getList).
 type Options struct {

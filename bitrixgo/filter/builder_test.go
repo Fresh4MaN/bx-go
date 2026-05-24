@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"bitrixgo/bitrixgo/filter"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/filter"
 )
 
 func TestParseKey(t *testing.T) {

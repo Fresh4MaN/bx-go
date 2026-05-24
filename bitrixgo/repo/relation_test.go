@@ -7,8 +7,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
 
-	"bitrixgo/bitrixgo/entity"
-	"bitrixgo/bitrixgo/repo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/repo"
 )
 
 type M2OContractor struct {

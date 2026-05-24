@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	bxerrors "bitrixgo/bitrixgo/errors"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
 )
 
 // TableNamer реализуют сущности, задающие логическое имя таблицы.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	bxerrors "bitrixgo/bitrixgo/errors"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
 )
 
 // Relation описывает связь: many-to-one (struct) или one-to-many (slice + inverse).

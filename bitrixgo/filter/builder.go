@@ -6,7 +6,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	bxerrors "bitrixgo/bitrixgo/errors"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
 )
 
 var operators = []string{">=", "<=", ">", "<", "=", "!", "%", "@"}

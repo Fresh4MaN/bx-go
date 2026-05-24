@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"bitrixgo/bitrixgo/entity"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
 )
 
 // Repository предоставляет CRUD-операции для сущности типа T.

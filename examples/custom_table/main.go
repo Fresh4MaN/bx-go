@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"log"
 
-	"bitrixgo/bitrixgo"
-	"bitrixgo/bitrixgo/filter"
-	"bitrixgo/bitrixgo/query"
-	"bitrixgo/bitrixgo/repo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/filter"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/query"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/repo"
 )
 
 type Consignee struct {

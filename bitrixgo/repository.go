@@ -3,7 +3,7 @@ package bitrixgo
 import (
 	"context"
 
-	"bitrixgo/bitrixgo/repo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/repo"
 )
 
 // NewRepository создаёт типизированный репозиторий для сущности T.

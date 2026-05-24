@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"bitrixgo/bitrixgo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo"
 )
 
 func TestDSNFromEnvFull(t *testing.T) {

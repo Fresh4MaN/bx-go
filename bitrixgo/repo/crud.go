@@ -7,10 +7,10 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"bitrixgo/bitrixgo/entity"
-	bxerrors "bitrixgo/bitrixgo/errors"
-	"bitrixgo/bitrixgo/filter"
-	"bitrixgo/bitrixgo/query"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/filter"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/query"
 )
 
 type querier interface {

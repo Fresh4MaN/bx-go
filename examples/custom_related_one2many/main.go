@@ -9,52 +9,31 @@ import (
 	"log"
 	"time"
 
-	"bitrixgo/bitrixgo"
-	"bitrixgo/bitrixgo/query"
+	"github.com/Fresh4MaN/bx-go/bitrixgo"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/query"
 )
 
 type Contract struct {
-	ID            int64      `bx:"ID;pk;auto"`
-	ContractorID  int64      `bx:"UF_CONTRACTOR_ID;ref=Contractor"`
-	Contractor    Contractor `bx:"rel=Contractor;fk=UF_CONTRACTOR_ID"`
-	PriceType     string     `bx:"UF_PRICE_TYPE"`
-	DelaySumLimit float64    `bx:"UF_DELAY_SUM_LIMIT"`
-	DelayDays     int64      `bx:"UF_DELAY_DAYS"`
-	Main          bool       `bx:"UF_MAIN"`
-	Active        bool       `bx:"UF_ACTIVE"`
-	DateTo        time.Time  `bx:"UF_DATE_TO"`
-	Name          string     `bx:"UF_NAME"`
-	DateFrom      time.Time  `bx:"UF_DATE_FROM"`
-	Number        string     `bx:"UF_NUMBER"`
-	Guid          string     `bx:"UF_GUID;ext"`
+	ID           int64      `bx:"ID;pk;auto"`
+	ContractorID int64      `bx:"UF_CONTRACTOR_ID;ref=Contractor"`
+	Contractor   Contractor `bx:"rel=Contractor;fk=UF_CONTRACTOR_ID"`
+	Active       bool       `bx:"UF_ACTIVE"`
+	DateTo       time.Time  `bx:"UF_DATE_TO"`
+	Name         string     `bx:"UF_NAME"`
+	DateFrom     time.Time  `bx:"UF_DATE_FROM"`
+	Number       string     `bx:"UF_NUMBER"`
+	Guid         string     `bx:"UF_GUID;ext"`
 }
 
 func (Contract) TableName() string { return "contract" }
 
 type Contractor struct {
-	ID                          int64      `bx:"ID;pk;auto"`
-	VatRate                     float64    `bx:"UF_VAT_RATE"`
-	DistributionChannel         string     `bx:"UF_DISTRIBUTION_CHANNEL"`
-	Active                      bool       `bx:"UF_ACTIVE"`
-	RegionalRepresentativeEmail string     `bx:"UF_REGIONAL_REPRESENTATIVE_EMAIL"`
-	RegionalRepresentativePhone string     `bx:"UF_REGIONAL_REPRESENTATIVE_PHONE"`
-	RegionalRepresentativeName  string     `bx:"UF_REGIONAL_REPRESENTATIVE_NAME"`
-	ManagerEmail                string     `bx:"UF_MANAGER_EMAIL"`
-	ManagerPhone                string     `bx:"UF_MANAGER_PHONE"`
-	ManagerName                 string     `bx:"UF_MANAGER_NAME"`
-	Kpp                         string     `bx:"UF_KPP"`
-	Inn                         string     `bx:"UF_INN"`
-	BankBic                     string     `bx:"UF_BANK_BIC"`
-	BankName                    string     `bx:"UF_BANK_NAME"`
-	BankCorAccount              string     `bx:"UF_BANK_COR_ACCOUNT"`
-	BankAccount                 string     `bx:"UF_BANK_ACCOUNT"`
-	ActualAddress               string     `bx:"UF_ACTUAL_ADDRESS"`
-	PostalAddress               string     `bx:"UF_POSTAL_ADDRESS"`
-	LegalAddress                string     `bx:"UF_LEGAL_ADDRESS"`
-	Name                        string     `bx:"UF_NAME"`
-	ShortName                   string     `bx:"UF_SHORT_NAME"`
-	Guid                        string     `bx:"UF_GUID;ext"`
-	Contracts                   []Contract `bx:"rel=Contract;fk=UF_CONTRACTOR_ID;inverse"`
+	ID        int64      `bx:"ID;pk;auto"`
+	Active    bool       `bx:"UF_ACTIVE"`
+	Name      string     `bx:"UF_NAME"`
+	ShortName string     `bx:"UF_SHORT_NAME"`
+	Guid      string     `bx:"UF_GUID;ext"`
+	Contracts []Contract `bx:"rel=Contract;fk=UF_CONTRACTOR_ID;inverse"`
 }
 
 func (Contractor) TableName() string { return "contractor" }
@@ -74,8 +53,6 @@ func main() {
 	contractor := &Contractor{
 		Name:      "ООО Ромашка",
 		ShortName: "Ромашка",
-		Inn:       "7707083893",
-		Kpp:       "770101001",
 		Guid:      "contractor-guid-1",
 		Active:    true,
 		Contracts: []Contract{
@@ -84,7 +61,6 @@ func main() {
 				Number:   "001/2026",
 				Guid:     "contract-guid-1",
 				Active:   true,
-				Main:     true,
 				DateFrom: now,
 				DateTo:   now.AddDate(1, 0, 0),
 			},

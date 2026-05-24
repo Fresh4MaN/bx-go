@@ -23,7 +23,17 @@ Go-библиотека для прямой работы с MySQL-базой 1C-
 ## Установка
 
 ```bash
-go get bitrixgo/bitrixgo
+go get github.com/Fresh4MaN/bx-go
+```
+
+Репозиторий: [github.com/Fresh4MaN/bx-go](https://github.com/Fresh4MaN/bx-go)
+
+```go
+import (
+    "github.com/Fresh4MaN/bx-go/bitrixgo"
+    "github.com/Fresh4MaN/bx-go/bitrixgo/filter"
+    "github.com/Fresh4MaN/bx-go/bitrixgo/query"
+)
 ```
 
 ## Быстрый старт
@@ -64,6 +74,15 @@ func (Consignee) TableName() string { return "consignee" }
 ### 3. CRUD
 
 ```go
+import (
+    "context"
+    "log"
+
+    "github.com/Fresh4MaN/bx-go/bitrixgo"
+    "github.com/Fresh4MaN/bx-go/bitrixgo/filter"
+    "github.com/Fresh4MaN/bx-go/bitrixgo/query"
+)
+
 ctx := context.Background()
 
 client, err := bitrixgo.NewFromEnv(ctx)
@@ -222,7 +241,7 @@ go run ./examples/custom_related_one2many
 ## Структура проекта
 
 ```
-bitrixgo/
+bx-go/               # корень модуля github.com/Fresh4MaN/bx-go
   bitrixgo/          # публичный API (Client, NewRepository, DeleteCascade)
     entity/          # meta, scan, preload, relations
     repo/            # Repository, CRUD, batch, upsert, cascade

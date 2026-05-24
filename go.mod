@@ -1,4 +1,4 @@
-module bitrixgo
+module github.com/Fresh4MaN/bx-go
 
 go 1.22
 

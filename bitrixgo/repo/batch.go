@@ -6,8 +6,8 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	bxerrors "bitrixgo/bitrixgo/errors"
-	"bitrixgo/bitrixgo/entity"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
 )
 
 // BatchUpdate содержит поля для обновления одной строки.

@@ -7,8 +7,8 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"bitrixgo/bitrixgo/entity"
-	bxerrors "bitrixgo/bitrixgo/errors"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
 )
 
 // Upsert обновляет по PK или ищет по ext → update/insert.

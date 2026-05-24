@@ -7,9 +7,9 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 
-	"bitrixgo/bitrixgo/entity"
-	"bitrixgo/bitrixgo/filter"
-	"bitrixgo/bitrixgo/query"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/entity"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/filter"
+	"github.com/Fresh4MaN/bx-go/bitrixgo/query"
 )
 
 // GetListByFK возвращает строки дочерней таблицы по FK родителя.

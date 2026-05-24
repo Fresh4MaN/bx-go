@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"strings"
 
-	bxerrors "bitrixgo/bitrixgo/errors"
+	bxerrors "github.com/Fresh4MaN/bx-go/bitrixgo/errors"
 )
 
 // Querier выполняет SQL-запросы ( *sql.DB или *sql.Tx ).
