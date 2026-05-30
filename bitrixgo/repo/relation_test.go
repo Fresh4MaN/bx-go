@@ -87,3 +87,62 @@ func TestSaveCascadeUpsertByExt(t *testing.T) {
 	require.Equal(t, int64(1), id)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+func TestSyncCascadeDeletesOrphans(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	client := newTestClient(db, "b_")
+	r := repo.NewRepository[ParentContractor](client)
+
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE b_contractor SET").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE b_contract SET").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM b_contract WHERE UF_CONTRACTOR_ID = \\? AND ID NOT IN").
+		WithArgs(int64(1), int64(10)).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
+
+	item := ParentContractor{
+		ID:   1,
+		Guid: "c-guid",
+		Name: "Test",
+		Contracts: []O2MContract{
+			{ID: 10, ContractorID: 1, Guid: "d-guid", Name: "Contract 1"},
+		},
+	}
+	id, err := r.SyncCascade(context.Background(), &item)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), id)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestSyncCascadeDeletesAllChildrenWhenSliceEmpty(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	client := newTestClient(db, "b_")
+	r := repo.NewRepository[ParentContractor](client)
+
+	mock.ExpectBegin()
+	mock.ExpectExec("UPDATE b_contractor SET").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("DELETE FROM b_contract WHERE UF_CONTRACTOR_ID = \\?").
+		WithArgs(int64(5)).
+		WillReturnResult(sqlmock.NewResult(0, 3))
+	mock.ExpectCommit()
+
+	item := ParentContractor{
+		ID:        5,
+		Guid:      "c-guid",
+		Name:      "Test",
+		Contracts: nil,
+	}
+	_, err = r.SyncCascade(context.Background(), &item)
+	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

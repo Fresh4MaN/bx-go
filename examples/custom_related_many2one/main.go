@@ -17,7 +17,6 @@ type Contract struct {
 	ID           int64      `bx:"ID;pk;auto"`
 	ContractorID int64      `bx:"UF_CONTRACTOR_ID;ref=Contractor"`
 	Contractor   Contractor `bx:"rel=Contractor;fk=UF_CONTRACTOR_ID"`
-	Active       bool       `bx:"UF_ACTIVE"`
 	DateTo       time.Time  `bx:"UF_DATE_TO"`
 	Name         string     `bx:"UF_NAME"`
 	DateFrom     time.Time  `bx:"UF_DATE_FROM"`
@@ -29,7 +28,6 @@ func (Contract) TableName() string { return "contract" }
 
 type Contractor struct {
 	ID        int64  `bx:"ID;pk;auto"`
-	Active    bool   `bx:"UF_ACTIVE"`
 	Name      string `bx:"UF_NAME"`
 	ShortName string `bx:"UF_SHORT_NAME"`
 	Guid      string `bx:"UF_GUID;ext"`
@@ -55,14 +53,12 @@ func main() {
 		Name:     "Договор №1",
 		Number:   "001/2026",
 		Guid:     "contract-guid-1",
-		Active:   true,
 		DateFrom: now,
 		DateTo:   now.AddDate(1, 0, 0),
 		Contractor: Contractor{
 			Name:      "ООО Ромашка",
 			ShortName: "Ромашка",
 			Guid:      "contractor-guid-1",
-			Active:    true,
 		},
 	})
 	if err != nil {

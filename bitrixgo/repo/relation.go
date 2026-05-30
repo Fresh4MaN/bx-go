@@ -76,6 +76,16 @@ func (r *Repository[T]) AddCascade(ctx context.Context, item *T) (int64, error) 
 
 // SaveCascade сохраняет родителя и дочерние one-to-many записи (upsert, без delete лишних).
 func (r *Repository[T]) SaveCascade(ctx context.Context, item *T) (int64, error) {
+	return r.cascadeSave(ctx, item, false)
+}
+
+// SyncCascade сохраняет родителя и дочерние one-to-many записи (upsert по PK/ext)
+// и удаляет дочерние строки с тем же FK, которых нет во входном slice.
+func (r *Repository[T]) SyncCascade(ctx context.Context, item *T) (int64, error) {
+	return r.cascadeSave(ctx, item, true)
+}
+
+func (r *Repository[T]) cascadeSave(ctx context.Context, item *T, syncDelete bool) (int64, error) {
 	tx, err := r.client.DB().BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("repo: begin tx: %w", err)
@@ -101,13 +111,22 @@ func (r *Repository[T]) SaveCascade(ctx context.Context, item *T) (int64, error)
 		}
 		fkRel := entity.ChildFKRelation(rel.FKColumn, rel.FKIndex)
 
+		var keptIDs []any
 		sliceVal := row.Field(rel.FieldIndex)
 		for j := 0; j < sliceVal.Len(); j++ {
 			child := sliceVal.Index(j)
 			if err := entity.SetFK(childMeta, fkRel, child, parentID); err != nil {
 				return 0, err
 			}
-			if _, err := upsertReflect(ctx, tx, r.client, childMeta, child); err != nil {
+			childID, err := upsertReflect(ctx, tx, r.client, childMeta, child)
+			if err != nil {
+				return 0, err
+			}
+			keptIDs = append(keptIDs, childID)
+		}
+
+		if syncDelete {
+			if err := deleteInverseOrphans(ctx, tx, r.client, childMeta, rel.FKColumn, parentID, keptIDs); err != nil {
 				return 0, err
 			}
 		}
@@ -117,6 +136,22 @@ func (r *Repository[T]) SaveCascade(ctx context.Context, item *T) (int64, error)
 		return 0, fmt.Errorf("repo: commit: %w", err)
 	}
 	return parentID, nil
+}
+
+func deleteInverseOrphans(ctx context.Context, q querier, client Client, childMeta *entity.Meta, fkColumn string, parentID any, keepIDs []any) error {
+	table := client.FullTableName(childMeta.Table)
+	b := ps.Delete(table).Where(sq.Eq{fkColumn: parentID})
+	if len(keepIDs) > 0 {
+		b = b.Where(sq.NotEq{childMeta.PrimaryKey: keepIDs})
+	}
+	sqlStr, args, err := b.ToSql()
+	if err != nil {
+		return fmt.Errorf("repo: build sync delete children: %w", err)
+	}
+	if _, err := q.ExecContext(ctx, sqlStr, args...); err != nil {
+		return fmt.Errorf("repo: sync delete children: %w", err)
+	}
+	return nil
 }
 
 // DeleteCascade удаляет дочерние записи и родителя в одной транзакции.

@@ -12,7 +12,7 @@ Go-библиотека для прямой работы с MySQL-базой 1C-
 - Фильтры в стиле Bitrix (`=FIELD`, `!FIELD`, `>FIELD`, `%FIELD`, `@FIELD`)
 - Preload связей отдельными SELECT (без JOIN)
 - Many-to-one и one-to-many (inverse)
-- Cascade: `AddCascade`, `SaveCascade`, `DeleteCascade`
+- Cascade: `AddCascade`, `SaveCascade`, `SyncCascade`, `DeleteCascade`
 - Upsert и поиск по внешнему коду (`ext`) — для интеграций без PK
 
 ## Требования
@@ -185,6 +185,19 @@ _, _ = contractorRepo.SaveCascade(ctx, &Contractor{
 
 `SaveCascade` обновляет только переданные дочерние записи; лишние строки в БД **не удаляются**.
 
+`SyncCascade` — полная синхронизация: upsert родителя и каждого элемента slice (по PK или `ext`), затем **удаление** дочерних строк с тем же FK, которых нет во входном slice. Пустой `Contracts: []Contract{}` удалит все договоры контрагента.
+
+```go
+_, _ = contractorRepo.SyncCascade(ctx, &Contractor{
+    Guid: "c-guid-1",
+    Name: "ООО Ромашка",
+    Contracts: []Contract{
+        {Guid: "d-guid-1", Name: "Договор №1"}, // останется
+        // d-guid-2 в БД, но не в slice — будет удалён
+    },
+})
+```
+
 ### Удаление каскадом
 
 ```go
@@ -221,7 +234,8 @@ row, err := repo.GetByExt(ctx, "external-guid-1")
 | `AddMulti` / `UpdateMulti` / `DeleteMulti` | Пакетные операции |
 | `GetListByFK` | Список дочерних записей по FK |
 | `AddCascade` | Insert дочерней записи + upsert родителя |
-| `SaveCascade` | Upsert родителя + upsert дочерних (one-to-many) |
+| `SaveCascade` | Upsert родителя + upsert дочерних (one-to-many), без delete лишних |
+| `SyncCascade` | Как SaveCascade + delete дочерних, не попавших в slice |
 
 ## Примеры
 
@@ -265,6 +279,6 @@ go test ./...
 - Только MySQL (прямое подключение к базе Bitrix)
 - Preload — отдельные SELECT, без JOIN
 - Один уровень cascade за вызов
-- `SaveCascade` не синхронизирует удаление «лишних» дочерних записей
+- Для удаления «лишних» дочерних записей используйте `SyncCascade`, а не `SaveCascade`
 - Таблицы должны существовать в базе (миграции не включены)
 - CRUD для сущностей не вызывает события bitrix (onBeforeAdd, onAfterUpdate и т.д.)
